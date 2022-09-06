@@ -12,10 +12,10 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
-	"quadtrix.nl/audit"
-	"quadtrix.nl/basicqueue"
-	"quadtrix.nl/configmanager"
-	"quadtrix.nl/servicelogger"
+	"github.com/quadtrix/audit"
+	"github.com/quadtrix/basicqueue"
+	"github.com/quadtrix/configmanager"
+	"github.com/quadtrix/servicelogger"
 )
 
 type DeltaMySQLLink struct {
