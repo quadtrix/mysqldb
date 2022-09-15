@@ -152,11 +152,14 @@ func (dmsl *DeltaMySQLLink) queuePolling() {
 				dmsl.slog.LogError("queuePolling.queue.asyncQueryQueue", "mysqldb", fmt.Sprintf("Error reading from queue: %s", err.Error()))
 				continue
 			}
-			if message.MessageType == "QUERY" {
-				err = dmsl.RunQueryInTransaction(message.Payload)
-				if err != nil {
-					dmsl.slog.LogError("RunQueryInTransaction", "mysqldb", fmt.Sprintf("Query failed: %s", err.Error()))
-					continue
+			if message.Destination == "mysqldb" || message.Destination == "all" {
+				switch message.MessageType {
+				case "QUERY":
+					err = dmsl.RunQueryInTransaction(message.Payload)
+					if err != nil {
+						dmsl.slog.LogError("RunQueryInTransaction", "mysqldb", fmt.Sprintf("Query failed: %s", err.Error()))
+						continue
+					}
 				}
 			}
 		}
@@ -168,11 +171,14 @@ func (dmsl *DeltaMySQLLink) queuePolling() {
 			}
 			monitorHistory = append(monitorHistory, message.MessageID)
 			dmsl.slog.LogDebug("queuePolling.queue.monitorNotification", "mysqldb", fmt.Sprintf("Received monitor event from %s: %s: %s", message.Source, message.MessageType, message.Payload))
-			if message.MessageType == "CHECK_CONF" {
-				dmsl.slog.LogTrace("queuePolling.queue.monitorNotification", "mysqldb", "Received CHECK_CONF event. Waiting for 2 seconds to ensure the configuration is re-read")
-				time.Sleep(2 * time.Second)
-				if dmsl.checkOnReloadConfigMessage(message.Payload) {
-					dmsl.checkReloadConfig()
+			if message.Destination == "mysqldb" || message.Destination == "all" {
+				switch message.MessageType {
+				case "CHECK_CONF":
+					dmsl.slog.LogTrace("queuePolling.queue.monitorNotification", "mysqldb", "Received CHECK_CONF event. Waiting for 2 seconds to ensure the configuration is re-read")
+					time.Sleep(2 * time.Second)
+					if dmsl.checkOnReloadConfigMessage(message.Payload) {
+						dmsl.checkReloadConfig()
+					}
 				}
 			}
 		}
@@ -182,20 +188,21 @@ func (dmsl *DeltaMySQLLink) queuePolling() {
 				dmsl.slog.LogError("queuePolling.queue.stopNotification", "mysqldb", fmt.Sprintf("Error reading from queue.stopNotification: %s", err.Error()))
 			}
 			stopHistory = append(stopHistory, message.MessageID)
-			dmsl.slog.LogDebug("queuePolling.queue.stopNotification", "mysqldb", fmt.Sprintf("Received stop event from %s: %s", message.Source, message.MessageType))
-			switch message.MessageType {
-			case "STOPDB":
-				dmsl.slog.LogInfo("queuePolling.queue.stopNotification", "mysqldb", fmt.Sprintf("Closing database connection to %s:%s/%s on queue.stopNotification trigger", dmsl.dbhost, dmsl.dbport, dmsl.dbname))
-				dmsl.dblink.Close()
-				dmsl.connected = false
-			case "STOP":
-				dmsl.slog.LogInfo("queuePolling.queue.stopNotification", "mysqldb", fmt.Sprintf("Closing database connection to %s:%s/%s, application stop event received", dmsl.dbhost, dmsl.dbport, dmsl.dbname))
-				dmsl.dblink.Close()
-				dmsl.connected = false
-				dmsl.eventQueue.AddJsonMessage(dmsl.queue_identifier, "mysqldb", "main", "DBSTOPPED", "")
-				break
+			if message.Destination == "mysqldb" || message.Destination == "all" {
+				dmsl.slog.LogDebug("queuePolling.queue.stopNotification", "mysqldb", fmt.Sprintf("Received event from %s: %s", message.Source, message.MessageType))
+				switch message.MessageType {
+				case "STOPDB":
+					dmsl.slog.LogInfo("queuePolling.queue.stopNotification", "mysqldb", fmt.Sprintf("Closing database connection to %s:%s/%s on queue.stopNotification trigger", dmsl.dbhost, dmsl.dbport, dmsl.dbname))
+					dmsl.dblink.Close()
+					dmsl.connected = false
+				case "STOP":
+					dmsl.slog.LogInfo("queuePolling.queue.stopNotification", "mysqldb", fmt.Sprintf("Closing database connection to %s:%s/%s, application stop event received", dmsl.dbhost, dmsl.dbport, dmsl.dbname))
+					dmsl.dblink.Close()
+					dmsl.connected = false
+					dmsl.eventQueue.AddJsonMessage(dmsl.queue_identifier, "mysqldb", "main", "DBSTOPPED", "")
+					break
+				}
 			}
-
 		}
 		for dmsl.eventQueue.PollWithHistory(dmsl.queue_identifier, eventHistory) {
 			message, err := dmsl.eventQueue.ReadJsonWithHistory(dmsl.queue_identifier, eventHistory)
@@ -203,19 +210,22 @@ func (dmsl *DeltaMySQLLink) queuePolling() {
 				dmsl.slog.LogError("queuePolling.queue.events", "mysqldb", fmt.Sprintf("Error reading from queue: %s", err.Error()))
 			}
 			eventHistory = append(eventHistory, message.MessageID)
-			if message.MessageType == "INITDB" {
-				dmsl.slog.LogTrace("queuePolling.queue.events", "mysqldb", fmt.Sprintf("Received INITDB event from %s. Checking database state", message.Source))
-				dmsl.checkDatabaseState(message.Payload)
+			if message.Destination == "mysqldb" || message.Destination == "all" {
+				switch message.MessageType {
+				case "INITDB":
+					dmsl.slog.LogTrace("queuePolling.queue.events", "mysqldb", fmt.Sprintf("Received INITDB event from %s. Checking database state", message.Source))
+					dmsl.checkDatabaseState(message.Payload)
+				}
 			}
 		}
 		// Cleanup the histories
-		if len(monitorHistory) > 50 {
+		if len(monitorHistory) > 500 {
 			monitorHistory = monitorHistory[10:]
 		}
-		if len(stopHistory) > 50 {
+		if len(stopHistory) > 500 {
 			stopHistory = stopHistory[10:]
 		}
-		if len(eventHistory) > 50 {
+		if len(eventHistory) > 500 {
 			eventHistory = eventHistory[10:]
 		}
 		time.Sleep(time.Second)
