@@ -323,6 +323,7 @@ func (dmsl DeltaMySQLLink) checkDatabaseState(version string) {
 		dmsl.slog.LogDebug("checkDatabaseState", "mysqldb", fmt.Sprintf("No patch version retrieved from database. Assuming empty."))
 	} else {
 		if rows.Next() {
+			defer rows.Close()
 			err = rows.Scan(&fromVersion)
 			if err != nil {
 				dmsl.slog.LogFatal("checkDatabaseState", "mysqldb", fmt.Sprintf("Failed to read database version from database: %s", err.Error()), 92)
