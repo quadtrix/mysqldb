@@ -487,8 +487,11 @@ func (dmsl DeltaMySQLLink) SelectSingleRow(fields []string, table string, condit
 func (dmsl DeltaMySQLLink) parseTransactionQuery(unparsedquery string, resultmap map[int]QueryResult) (parsedquery string, err error) {
 	dmsl.slog.LogTrace("parseTransactionQuery", "mysqldb", fmt.Sprintf("Unparsed query: %s", unparsedquery))
 	// Parse query string one character at a time
+	startindex := -1
+	endindex := -1
 	for i, c := range unparsedquery {
 		if c == '<' {
+			startindex = c
 			// Start replacement
 			for j, d := range unparsedquery[i:] {
 				if d == '>' {
@@ -517,6 +520,9 @@ func (dmsl DeltaMySQLLink) parseTransactionQuery(unparsedquery string, resultmap
 				}
 			}
 		} else {
+			if i >= startindex && i <= endindex {
+				continue
+			}
 			parsedquery = parsedquery + string(c)
 		}
 	}
