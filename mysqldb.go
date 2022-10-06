@@ -512,8 +512,8 @@ func (dmsl DeltaMySQLLink) parseTransactionQuery(unparsedquery string, resultmap
 						return "", errors.New(fmt.Sprintf("invalid field reference %s at position %d", replacement, i))
 					}
 					fieldvalue := resultmap[mapindex].Values[fieldindex]
-					dmsl.slog.LogTrace("parseTransactionQuery", "mysqldb", fmt.Sprintf("Replacing %s with %s", replacement, reflect.ValueOf(fieldvalue).String()))
-					parsedquery = parsedquery + reflect.ValueOf(fieldvalue).String()
+					dmsl.slog.LogTrace("parseTransactionQuery", "mysqldb", fmt.Sprintf("Replacing %s with %v", replacement, reflect.ValueOf(fieldvalue)))
+					parsedquery = parsedquery + fmt.Sprintf("%v", reflect.ValueOf(fieldvalue))
 				}
 			}
 		} else {
