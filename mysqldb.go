@@ -517,7 +517,7 @@ func (dmsl DeltaMySQLLink) parseTransactionQuery(unparsedquery string, resultmap
 	return parsedquery, nil
 }
 
-// RunMultipleQueriesInTransaction runs multiple queries in a single transaction. If one of the queries fails, a rollback is performed, if all queries are sucessful, a commit is done. It is possible to use results from previous queries in subsequent queries. The queries array is 0-based and fields from selects in the query list can be addressed by using the format: <[row-id]:[fieldname]>, for example: Query 0: SELECT selectedfield FROM table, Query 1: UPDATE table SET selectedfield=<0:selectedfield>+1
+// RunMultipleQueriesInTransaction runs multiple queries in a single transaction. If one of the queries fails, a rollback is performed, if all queries are sucessful, a commit is done. It is possible to use results from previous queries in subsequent queries. The queries array is 0-based and fields from selects (and the 'id' field from an insert) in the query list can be addressed by using the format: <[row-id]:[fieldname]>, for example: Query 0: SELECT selectedfield FROM table, Query 1: UPDATE table SET selectedfield=<0:selectedfield>+1
 func (dmsl *DeltaMySQLLink) RunMultipleQueriesInTransaction(queries []string) (resultmap map[int]QueryResult, err error) {
 	tx, err := dmsl.dblink.Begin()
 	if err != nil {
