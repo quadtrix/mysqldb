@@ -3,8 +3,10 @@ package mysqldb
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -34,6 +36,13 @@ type DeltaMySQLLink struct {
 	connected        bool
 	queue_identifier string
 	auditing         *audit.Audit
+}
+
+type QueryResult struct {
+	QueryType string
+	NumRows   int64
+	Fields    []string
+	Values    []interface{}
 }
 
 // New returns a new DeltaMySQLLink object
@@ -444,4 +453,138 @@ func (dmsl *DeltaMySQLLink) Select(fields string, table string, filters ...strin
 	dmsl.slog.LogDebug("Select", "mysqldb", fmt.Sprintf("SELECT %s FROM %s %s", fields, table, filterstring))
 	query := fmt.Sprintf("SELECT %s FROM %s %s", fields, table, filterstring)
 	return dmsl.dblink.Query(query)
+}
+
+// SelectSingleRow selects a single database row consisting of the values of fields from table, honoring conditions and returns this in variables, which should be pointers to variables you define before calling this function.
+func (dmsl DeltaMySQLLink) SelectSingleRow(fields []string, table string, conditions []string, variables ...any) (err error) {
+	if len(variables) != len(fields) {
+		return errors.New(fmt.Sprintf("%d fields requested, but %d variables provided", len(fields), len(variables)))
+	}
+	var strfields string = ""
+	for _, field := range fields {
+		strfields += field + ","
+	}
+	rows, err := dmsl.Select(strfields[:len(strfields)-2], table, conditions...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	if rows.Next() {
+		err = rows.Scan(variables)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	return errors.New("no data returned")
+}
+
+func (dmsl DeltaMySQLLink) parseTransactionQuery(unparsedquery string, resultmap map[int]QueryResult) (parsedquery string, err error) {
+	dmsl.slog.LogTrace("parseTransactionQuery", "mysqldb", fmt.Sprintf("Unparsed query: %s", unparsedquery))
+	// Parse query string one character at a time
+	for i, c := range unparsedquery {
+		if c == '<' {
+			// Start replacement
+			for j, d := range unparsedquery[i:] {
+				if d == '>' {
+					// End replacement
+					dmsl.slog.LogTrace("parseTransactionQuery", "mysqldb", fmt.Sprintf("Found field reference between string indexes %d and %d", i, j))
+					replacement := unparsedquery[i+1 : j-1]
+					replparts := strings.Split(replacement, ":")
+					mapindex, err := strconv.Atoi(replparts[0])
+					if err != nil {
+						return "", errors.New(fmt.Sprintf("unparseable query index %s at position %d", replparts[0], i))
+					}
+					mapfield := replparts[1]
+					var fieldindex int = -1
+					for k, field := range resultmap[mapindex].Fields {
+						if field == mapfield {
+							fieldindex = k
+						}
+					}
+					if fieldindex == -1 {
+						return "", errors.New(fmt.Sprintf("invalid field reference %s at position %d", replacement, i))
+					}
+					fieldvalue := resultmap[mapindex].Values[fieldindex]
+					dmsl.slog.LogTrace("parseTransactionQuery", "mysqldb", fmt.Sprintf("Replacing %s with %s", replacement, reflect.ValueOf(fieldvalue).String()))
+					parsedquery = parsedquery + reflect.ValueOf(fieldvalue).String()
+				}
+			}
+		} else {
+			parsedquery = parsedquery + string(c)
+		}
+	}
+	return parsedquery, nil
+}
+
+// RunMultipleQueriesInTransaction runs multiple queries in a single transaction. If one of the queries fails, a rollback is performed, if all queries are sucessful, a commit is done. It is possible to use results from previous queries in subsequent queries. The queries array is 0-based and fields from selects in the query list can be addressed by using the format: <[row-id]:[fieldname]>, for example: Query 0: SELECT selectedfield FROM table, Query 1: UPDATE table SET selectedfield=<0:selectedfield>+1
+func (dmsl *DeltaMySQLLink) RunMultipleQueriesInTransaction(queries []string) (resultmap map[int]QueryResult, err error) {
+	tx, err := dmsl.dblink.Begin()
+	if err != nil {
+		return resultmap, err
+	}
+	for n, query := range queries {
+		firstword := strings.Split(query, " ")[0]
+		switch firstword {
+		case "SELECT":
+			parsedq, err := dmsl.parseTransactionQuery(query, resultmap)
+			if err != nil {
+				tx.Rollback()
+				return resultmap, errors.New(fmt.Sprintf("DME-2001: Query parse error, rollback performed. Details: Query: %d, Error: %s", n, err.Error()))
+			}
+			rows, err := tx.Query(parsedq)
+			if err != nil {
+				tx.Rollback()
+				return resultmap, errors.New(fmt.Sprintf("DME-2002: Query execution error, rollback performed. Details: Query: %d, Error: %s", n, err.Error()))
+			}
+			defer rows.Close()
+			var qr QueryResult
+			qr.QueryType = "select"
+			// Get the fields from the query
+			words := strings.Fields(parsedq)
+			for _, word := range words {
+				if strings.ToLower(word) == "from" {
+					break
+				}
+				if strings.ToLower(word) == "select" {
+					continue
+				}
+				if strings.HasSuffix(word, ",") {
+					word = string(word[len(word)-2])
+				}
+				qr.Fields = append(qr.Fields, word)
+			}
+			var counter int = 0
+			for rows.Next() {
+				counter++
+				var values []interface{}
+				err = rows.Scan(values...)
+				qr.Values = append(qr.Values, values...)
+			}
+			qr.NumRows = int64(counter)
+			resultmap[n] = qr
+		case "INSERT", "UPDATE", "DELETE", "ALTER", "DROP", "CREATE":
+			// variable substitution if necessary, after that, prepare and execute, record rows affected.
+			parsedq, err := dmsl.parseTransactionQuery(query, resultmap)
+			if err != nil {
+				tx.Rollback()
+				return resultmap, errors.New(fmt.Sprintf("DME-2001: Query parse error, rollback performed. Details: Query: %d, Error: %s", n, err.Error()))
+			}
+			stmt, err := tx.Prepare(parsedq)
+			result, err := stmt.Exec()
+			if err != nil {
+				tx.Rollback()
+				return resultmap, errors.New(fmt.Sprintf("DME-2002: Query execution error, rollback performed. Details: Query: %d, Error: %s", n, err.Error()))
+			}
+			var qr QueryResult
+			qr.QueryType = strings.ToLower(firstword)
+			qr.NumRows, _ = result.RowsAffected()
+			qr.Fields = []string{"id"}
+			lastid, _ := result.LastInsertId()
+			qr.Values = []interface{}{lastid}
+			resultmap[n] = qr
+		}
+	}
+	tx.Commit()
+	return resultmap, nil
 }
