@@ -521,9 +521,10 @@ func (dmsl DeltaMySQLLink) parseTransactionQuery(unparsedquery string, resultmap
 			}
 		} else {
 			if i >= startindex && i <= endindex {
-				continue
+				dmsl.slog.LogTrace("parseTransactionQuery", "mysqldb", fmt.Sprintf("Skipping already processed character at position %d", i))
+			} else {
+				parsedquery = parsedquery + string(c)
 			}
-			parsedquery = parsedquery + string(c)
 		}
 	}
 	dmsl.slog.LogTrace("parseTransactionQuery", "mysqldb", fmt.Sprintf("Parsed query: %s", parsedquery))
