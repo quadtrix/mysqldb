@@ -464,8 +464,10 @@ func (dmsl DeltaMySQLLink) SelectSingleRow(fields []string, table string, condit
 	for _, field := range fields {
 		strfields += field + ","
 	}
+	dmsl.slog.LogTrace("SelectSingleRow", "mysqldb", fmt.Sprintf("Fields in query: %s", strfields))
 	rows, err := dmsl.Select(strfields[:len(strfields)-2], table, conditions...)
 	if err != nil {
+		dmsl.slog.LogError("SelectSingleRow", "mysqldb", fmt.Sprintf("Error running SELECT query: %s", err.Error()))
 		return err
 	}
 	defer rows.Close()
@@ -519,22 +521,26 @@ func (dmsl DeltaMySQLLink) parseTransactionQuery(unparsedquery string, resultmap
 
 // RunMultipleQueriesInTransaction runs multiple queries in a single transaction. If one of the queries fails, a rollback is performed, if all queries are sucessful, a commit is done. It is possible to use results from previous queries in subsequent queries. The queries array is 0-based and fields from selects (and the 'id' field from an insert) in the query list can be addressed by using the format: <[row-id]:[fieldname]>, for example: Query 0: SELECT selectedfield FROM table, Query 1: UPDATE table SET selectedfield=<0:selectedfield>+1
 func (dmsl *DeltaMySQLLink) RunMultipleQueriesInTransaction(queries []string) (resultmap map[int]QueryResult, err error) {
+	dmsl.slog.LogTrace("RunMultipleQueriesInTransaction", "mysqldb", fmt.Sprintf("Running %d queries in single transaction", len(queries)))
 	tx, err := dmsl.dblink.Begin()
 	if err != nil {
 		return resultmap, err
 	}
 	for n, query := range queries {
+		dmsl.slog.LogTrace("RunMultipleQueriesInTransaction", "mysqldb", fmt.Sprintf("Query %d: %s", n, query))
 		firstword := strings.Split(query, " ")[0]
 		switch firstword {
 		case "SELECT":
 			parsedq, err := dmsl.parseTransactionQuery(query, resultmap)
 			if err != nil {
 				tx.Rollback()
+				dmsl.slog.LogError("RunMultipleQueriesInTransaction", "mysqldb", fmt.Sprintf("DME-2001: Query parse error, rollback performed. Details: Query: %d, Error: %s", n, err.Error()))
 				return resultmap, errors.New(fmt.Sprintf("DME-2001: Query parse error, rollback performed. Details: Query: %d, Error: %s", n, err.Error()))
 			}
 			rows, err := tx.Query(parsedq)
 			if err != nil {
 				tx.Rollback()
+				dmsl.slog.LogError("RunMultipleQueriesInTransaction", "mysqldb", fmt.Sprintf("DME-2002: Query execution error, rollback performed. Details: Query: %d, Error: %s", n, err.Error()))
 				return resultmap, errors.New(fmt.Sprintf("DME-2002: Query execution error, rollback performed. Details: Query: %d, Error: %s", n, err.Error()))
 			}
 			defer rows.Close()
@@ -562,18 +568,22 @@ func (dmsl *DeltaMySQLLink) RunMultipleQueriesInTransaction(queries []string) (r
 				qr.Values = append(qr.Values, values...)
 			}
 			qr.NumRows = int64(counter)
+			dmsl.slog.LogTrace("RunMultipleQueriesInTransaction", "mysqldb", fmt.Sprintf("Query %d: Result: %v", n, qr))
 			resultmap[n] = qr
 		case "INSERT":
 			// variable substitution if necessary, after that, prepare and execute, record rows affected.
+			dmsl.slog.LogTrace("RunMultipleQueriesInTransaction", "mysqldb", fmt.Sprintf("Query %d: %s", n, query))
 			parsedq, err := dmsl.parseTransactionQuery(query, resultmap)
 			if err != nil {
 				tx.Rollback()
+				dmsl.slog.LogError("RunMultipleQueriesInTransaction", "mysqldb", fmt.Sprintf("DME-2001: Query parse error, rollback performed. Details: Query: %d, Error: %s", n, err.Error()))
 				return resultmap, errors.New(fmt.Sprintf("DME-2001: Query parse error, rollback performed. Details: Query: %d, Error: %s", n, err.Error()))
 			}
 			stmt, err := tx.Prepare(parsedq)
 			result, err := stmt.Exec()
 			if err != nil {
 				tx.Rollback()
+				dmsl.slog.LogError("RunMultipleQueriesInTransaction", "mysqldb", fmt.Sprintf("DME-2002: Query execution error, rollback performed. Details: Query: %d, Error: %s", n, err.Error()))
 				return resultmap, errors.New(fmt.Sprintf("DME-2002: Query execution error, rollback performed. Details: Query: %d, Error: %s", n, err.Error()))
 			}
 			var qr QueryResult
@@ -583,17 +593,21 @@ func (dmsl *DeltaMySQLLink) RunMultipleQueriesInTransaction(queries []string) (r
 			lastid, _ := result.LastInsertId()
 			qr.Values = []interface{}{lastid}
 			resultmap[n] = qr
+			dmsl.slog.LogTrace("RunMultipleQueriesInTransaction", "mysqldb", fmt.Sprintf("Query %d: Result: %v", n, qr))
 		case "UPDATE", "DELETE", "ALTER", "DROP", "CREATE":
 			// variable substitution if necessary, after that, prepare and execute, record rows affected.
+			dmsl.slog.LogTrace("RunMultipleQueriesInTransaction", "mysqldb", fmt.Sprintf("Query %d: %s", n, query))
 			parsedq, err := dmsl.parseTransactionQuery(query, resultmap)
 			if err != nil {
 				tx.Rollback()
+				dmsl.slog.LogError("RunMultipleQueriesInTransaction", "mysqldb", fmt.Sprintf("DME-2001: Query parse error, rollback performed. Details: Query: %d, Error: %s", n, err.Error()))
 				return resultmap, errors.New(fmt.Sprintf("DME-2001: Query parse error, rollback performed. Details: Query: %d, Error: %s", n, err.Error()))
 			}
 			stmt, err := tx.Prepare(parsedq)
 			result, err := stmt.Exec()
 			if err != nil {
 				tx.Rollback()
+				dmsl.slog.LogError("RunMultipleQueriesInTransaction", "mysqldb", fmt.Sprintf("DME-2002: Query execution error, rollback performed. Details: Query: %d, Error: %s", n, err.Error()))
 				return resultmap, errors.New(fmt.Sprintf("DME-2002: Query execution error, rollback performed. Details: Query: %d, Error: %s", n, err.Error()))
 			}
 			var qr QueryResult
@@ -602,8 +616,10 @@ func (dmsl *DeltaMySQLLink) RunMultipleQueriesInTransaction(queries []string) (r
 			qr.Fields = []string{}
 			qr.Values = []interface{}{}
 			resultmap[n] = qr
+			dmsl.slog.LogTrace("RunMultipleQueriesInTransaction", "mysqldb", fmt.Sprintf("Query %d: Result: %v", n, qr))
 		}
 	}
+	dmsl.slog.LogDebug("RunMultipleQueriesInTransaction", "mysqldb", "Performing commit")
 	tx.Commit()
 	return resultmap, nil
 }
