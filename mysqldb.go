@@ -465,7 +465,7 @@ func (dmsl DeltaMySQLLink) SelectSingleRow(fields []string, table string, condit
 		strfields += field + ","
 	}
 	dmsl.slog.LogTrace("SelectSingleRow", "mysqldb", fmt.Sprintf("Fields in query: %s", strfields))
-	rows, err := dmsl.Select(strfields[:len(strfields)-2], table, conditions...)
+	rows, err := dmsl.Select(strfields[:len(strfields)-1], table, conditions...)
 	if err != nil {
 		dmsl.slog.LogError("SelectSingleRow", "mysqldb", fmt.Sprintf("Error running SELECT query: %s", err.Error()))
 		return err
