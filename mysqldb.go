@@ -477,6 +477,7 @@ func (dmsl DeltaMySQLLink) SelectSingleRow(fields []string, table string, condit
 		if err != nil {
 			return err
 		}
+		dmsl.slog.LogTrace("SelectSingleRow", "mysqldb", fmt.Sprintf("First result: %v", variables))
 		return nil
 	}
 	return errors.New("no data returned")
