@@ -495,7 +495,7 @@ func (dmsl DeltaMySQLLink) parseTransactionQuery(unparsedquery string, resultmap
 					// End replacement
 					endindex := j + i
 					dmsl.slog.LogTrace("parseTransactionQuery", "mysqldb", fmt.Sprintf("Found field reference between string indexes %d and %d", i, endindex))
-					replacement := unparsedquery[i+1 : endindex-1]
+					replacement := unparsedquery[i+1 : endindex]
 					replparts := strings.Split(replacement, ":")
 					mapindex, err := strconv.Atoi(replparts[0])
 					if err != nil {
