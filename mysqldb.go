@@ -563,7 +563,7 @@ func (dmsl *DeltaMySQLLink) RunMultipleQueriesInTransaction(queries []string) (r
 			}
 			qr.NumRows = int64(counter)
 			resultmap[n] = qr
-		case "INSERT", "UPDATE", "DELETE", "ALTER", "DROP", "CREATE":
+		case "INSERT":
 			// variable substitution if necessary, after that, prepare and execute, record rows affected.
 			parsedq, err := dmsl.parseTransactionQuery(query, resultmap)
 			if err != nil {
@@ -582,6 +582,25 @@ func (dmsl *DeltaMySQLLink) RunMultipleQueriesInTransaction(queries []string) (r
 			qr.Fields = []string{"id"}
 			lastid, _ := result.LastInsertId()
 			qr.Values = []interface{}{lastid}
+			resultmap[n] = qr
+		case "UPDATE", "DELETE", "ALTER", "DROP", "CREATE":
+			// variable substitution if necessary, after that, prepare and execute, record rows affected.
+			parsedq, err := dmsl.parseTransactionQuery(query, resultmap)
+			if err != nil {
+				tx.Rollback()
+				return resultmap, errors.New(fmt.Sprintf("DME-2001: Query parse error, rollback performed. Details: Query: %d, Error: %s", n, err.Error()))
+			}
+			stmt, err := tx.Prepare(parsedq)
+			result, err := stmt.Exec()
+			if err != nil {
+				tx.Rollback()
+				return resultmap, errors.New(fmt.Sprintf("DME-2002: Query execution error, rollback performed. Details: Query: %d, Error: %s", n, err.Error()))
+			}
+			var qr QueryResult
+			qr.QueryType = strings.ToLower(firstword)
+			qr.NumRows, _ = result.RowsAffected()
+			qr.Fields = []string{}
+			qr.Values = []interface{}{}
 			resultmap[n] = qr
 		}
 	}
