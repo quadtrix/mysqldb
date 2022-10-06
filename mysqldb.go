@@ -472,7 +472,8 @@ func (dmsl DeltaMySQLLink) SelectSingleRow(fields []string, table string, condit
 	}
 	defer rows.Close()
 	if rows.Next() {
-		err = rows.Scan(variables)
+		dmsl.slog.LogTrace("SelectSingleRow", "mysqldb", "Scanning result row")
+		err = rows.Scan(&variables)
 		if err != nil {
 			return err
 		}
