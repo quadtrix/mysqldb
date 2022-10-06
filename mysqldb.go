@@ -520,6 +520,7 @@ func (dmsl DeltaMySQLLink) parseTransactionQuery(unparsedquery string, resultmap
 			parsedquery = parsedquery + string(c)
 		}
 	}
+	dmsl.slog.LogTrace("parseTransactionQuery", "mysqldb", fmt.Sprintf("Parsed query: %s", parsedquery))
 	return parsedquery, nil
 }
 
