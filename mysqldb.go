@@ -491,12 +491,12 @@ func (dmsl DeltaMySQLLink) parseTransactionQuery(unparsedquery string, resultmap
 	endindex := -1
 	for i, c := range unparsedquery {
 		if c == '<' {
-			startindex = c
+			startindex = i
 			// Start replacement
 			for j, d := range unparsedquery[i:] {
 				if d == '>' {
 					// End replacement
-					endindex := j + i
+					endindex = j + i
 					dmsl.slog.LogTrace("parseTransactionQuery", "mysqldb", fmt.Sprintf("Found field reference between string indexes %d and %d", i, endindex))
 					replacement := unparsedquery[i+1 : endindex]
 					replparts := strings.Split(replacement, ":")
@@ -633,6 +633,9 @@ func (dmsl *DeltaMySQLLink) RunMultipleQueriesInTransaction(queries []string) (r
 		}
 	}
 	dmsl.slog.LogDebug("RunMultipleQueriesInTransaction", "mysqldb", "Performing commit")
-	tx.Commit()
+	err = tx.Commit()
+	if err != nil {
+		dmsl.slog.LogError("RunMultipleQueriesInTransaction", "mysqldb", fmt.Sprintf("Final commit failed: %s", err.Error()))
+	}
 	return resultmap, nil
 }
