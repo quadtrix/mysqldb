@@ -142,8 +142,9 @@ func (dmsl *MySQLLink) queuePolling() {
 	dmsl.slog.LogInfo("queuePolling", "mysqldb", "Starting queue polling")
 	var eventHistory []string
 	for {
+		dmsl.slog.LogTrace("queuePolling.queue.asyncQueryQueue", "mysqldb", "Polling queue")
 		for dmsl.asyncQueryQueue.Poll(dmsl.cons_queue_identifier) {
-			dmsl.slog.LogTrace("queuePolling.queue.asyncQueryQueue", "mysqldb", "Message on queue")
+			dmsl.slog.LogTrace("queuePolling.queue.asyncQueryQueue", "mysqldb", "Message(s) on queue")
 			message, err := dmsl.asyncQueryQueue.ReadJson(dmsl.cons_queue_identifier)
 			dmsl.slog.LogTrace("queuePolling.queue.asyncQueryQueue", "mysqldb", fmt.Sprintf("Message is: %s - %s", message.MessageType, message.Payload))
 			if err != nil {
@@ -162,8 +163,11 @@ func (dmsl *MySQLLink) queuePolling() {
 			}
 		}
 
+		dmsl.slog.LogTrace("queuePolling.queue.events", "mysqldb", "Polling queue")
 		for dmsl.eventQueue.PollWithHistory(dmsl.cons_queue_identifier, eventHistory) {
+			dmsl.slog.LogTrace("queuePolling.queue.events", "mysqldb", "Message(s) on queue")
 			message, err := dmsl.eventQueue.ReadJsonWithHistory(dmsl.cons_queue_identifier, eventHistory)
+			dmsl.slog.LogTrace("queuePolling.queue.events", "mysqldb", fmt.Sprintf("Message is %s - %s", message.MessageType, message.Payload))
 			if err != nil {
 				dmsl.slog.LogError("queuePolling.queue.events", "mysqldb", fmt.Sprintf("Error reading from queue: %s", err.Error()))
 			}
@@ -173,6 +177,10 @@ func (dmsl *MySQLLink) queuePolling() {
 				case "INITDB":
 					dmsl.slog.LogTrace("queuePolling.queue.events", "mysqldb", fmt.Sprintf("Received INITDB event from %s. Checking database state", message.Source))
 					dmsl.checkDatabaseState(message.Payload)
+					err = dmsl.eventQueue.AddJsonMessage(dmsl.prod_queue_identifier, "mysqldb", "main", "INITDBDONE", message.Payload)
+					if err != nil {
+						dmsl.slog.LogError("queuePolling.queue.events", "mysqldb", fmt.Sprintf("Error writing to queue: %s", err.Error()))
+					}
 				case "CHECK_CONF":
 					dmsl.slog.LogTrace("queuePolling.queue.monitorNotification", "mysqldb", "Received CHECK_CONF event. Waiting for 2 seconds to ensure the configuration is re-read")
 					time.Sleep(2 * time.Second)

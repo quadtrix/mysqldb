@@ -7,7 +7,7 @@ require (
 	github.com/quadtrix/audit v0.0.0-20230802091001-1c818bdd292d
 	github.com/quadtrix/basicqueue v0.0.0-20230802091001-7442fc831ebe
 	github.com/quadtrix/configmanager v0.0.0-20230802091013-93a2315ea425
-	github.com/quadtrix/servicelogger v0.0.0-20230802091025-f0c0a6a3fbf8
+	github.com/quadtrix/servicelogger v1.0.0-rc1
 )
 
 require (
