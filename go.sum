@@ -12,7 +12,7 @@ github.com/quadtrix/basicqueue v0.0.0-20230802091001-7442fc831ebe h1:CRmPqrP4yVa
 github.com/quadtrix/basicqueue v0.0.0-20230802091001-7442fc831ebe/go.mod h1:yxp9kMfTaiBSP7c9ao5xrIKlfRCiACSCQ4SZSu6Cew8=
 github.com/quadtrix/configmanager v0.0.0-20230802091013-93a2315ea425 h1:ZCP1B9R2IFe/kuEL9l2b2LV7RJcSwqGq2FyooSMQOAE=
 github.com/quadtrix/configmanager v0.0.0-20230802091013-93a2315ea425/go.mod h1:c7uLtHYZSgv0F+0jNWDitw82rO/5U4XaJq+CcCH90CI=
-github.com/quadtrix/servicelogger v0.0.0-20230802091025-f0c0a6a3fbf8 h1:ptDh9hGODaQVfisTKWa2WCSruRrVAGTHpXdCzHcMuvg=
-github.com/quadtrix/servicelogger v0.0.0-20230802091025-f0c0a6a3fbf8/go.mod h1:Flopvk6JG16uUTEUMkHxNOaM9Yi0xyqAL/bl4Yf9Odc=
+github.com/quadtrix/servicelogger v1.0.0-rc1 h1:UtxIe0XdghPMIDPW+rHrDexRACVmfk0/NHAqn3aXtr8=
+github.com/quadtrix/servicelogger v1.0.0-rc1/go.mod h1:Flopvk6JG16uUTEUMkHxNOaM9Yi0xyqAL/bl4Yf9Odc=
 golang.org/x/sys v0.0.0-20220908164124-27713097b956 h1:XeJjHH1KiLpKGb6lvMiksZ9l0fVUh+AmGcm0nOMEBOY=
 golang.org/x/sys v0.0.0-20220908164124-27713097b956/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
