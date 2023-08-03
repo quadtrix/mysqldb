@@ -54,11 +54,11 @@ func New(slog *servicelogger.Logger, cfg *configmanager.Configuration, asyncQuer
 	dmsl.dbname = cfg.GetString("database.name")
 	dmsl.eventQueue = eventQueue
 	dmsl.asyncQueryQueue = asyncQueryQueue
-	err = dmsl.eventQueue.RegisterProducer(dmsl.prod_queue_identifier)
+	err = eventQueue.RegisterProducer(dmsl.prod_queue_identifier)
 	if err != nil {
 		return MySQLLink{}, err
 	}
-	err = dmsl.eventQueue.RegisterConsumer(dmsl.cons_queue_identifier)
+	err = eventQueue.RegisterConsumer(dmsl.cons_queue_identifier)
 	if err != nil {
 		return MySQLLink{}, err
 	}
