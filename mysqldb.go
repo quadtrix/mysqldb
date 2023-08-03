@@ -1,4 +1,4 @@
-//Package mysqldb implements functions for dealing with the Delta database
+// Package mysqldb implements functions for dealing with the Delta database
 package mysqldb
 
 import (
@@ -143,7 +143,9 @@ func (dmsl *MySQLLink) queuePolling() {
 	var eventHistory []string
 	for {
 		for dmsl.asyncQueryQueue.Poll(dmsl.cons_queue_identifier) {
+			dmsl.slog.LogTrace("queuePolling.queue.asyncQueryQueue", "mysqldb", "Message on queue")
 			message, err := dmsl.asyncQueryQueue.ReadJson(dmsl.cons_queue_identifier)
+			dmsl.slog.LogTrace("queuePolling.queue.asyncQueryQueue", "mysqldb", fmt.Sprintf("Message is: %s - %s", message.MessageType, message.Payload))
 			if err != nil {
 				dmsl.slog.LogError("queuePolling.queue.asyncQueryQueue", "mysqldb", fmt.Sprintf("Error reading from queue: %s", err.Error()))
 				continue
