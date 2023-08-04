@@ -222,7 +222,7 @@ func (dmsl *MySQLLink) queuePolling() {
 
 		for dmsl.stopNotificationQueue.PollWithHistory(dmsl.cons_queue_identifier, stopHistory) {
 			dmsl.slog.LogTrace("queuePolling.queue.stopNotification", "mysqldb", "Message(s) on queue")
-			message, err := dmsl.monitorNotificationQueue.ReadJsonWithHistory(dmsl.cons_queue_identifier, stopHistory)
+			message, err := dmsl.stopNotificationQueue.ReadJsonWithHistory(dmsl.cons_queue_identifier, stopHistory)
 			dmsl.slog.LogTrace("queuePolling.queue.stopNotification", "mysqldb", fmt.Sprintf("Message is %s - %s", message.MessageType, message.Payload))
 			if err != nil {
 				dmsl.slog.LogError("queuePolling.queue.stopNotification", "mysqldb", fmt.Sprintf("Error reading from queue: %s", err.Error()))
