@@ -612,11 +612,11 @@ func (dmsl *MySQLLink) RunMultipleQueriesInTransaction(queries []string) (result
 			stmt, err := tx.Prepare(parsedq)
 			if err != nil {
 				tx.Rollback()
-				dmsl.slog.LogError("RunMultipleQueriesInTransaction", "mysqldb", fmt.Sprintf("DME-2002: Query execution error, rollback performed. Details: Query: %d, Error: %s", n, err.Error()))
-				return resultmap, fmt.Errorf("DME-2002: Query execution error, rollback performed. Details: Query: %d, Error: %s", n, err.Error())
+				dmsl.slog.LogError("RunMultipleQueriesInTransaction", "mysqldb", fmt.Sprintf("DME-2002: Query preparation error, rollback performed. Details: Query: %d, Error: %s", n, err.Error()))
+				return resultmap, fmt.Errorf("DME-2002: Query preparation error, rollback performed. Details: Query: %d, Error: %s", n, err.Error())
 			}
 			//dmsl.slog.LogTrace("RunMultipleQueriesInTransaction", "mysqldb", fmt.Sprintf("Query %d: %s", n, parsedq))
-			result, err := stmt.Exec()
+			result, err := tx.Stmt(stmt).Exec()
 			if err != nil {
 				tx.Rollback()
 				dmsl.slog.LogError("RunMultipleQueriesInTransaction", "mysqldb", fmt.Sprintf("DME-2002: Query execution error, rollback performed. Details: Query: %d, Error: %s", n, err.Error()))
